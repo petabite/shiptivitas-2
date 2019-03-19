@@ -114,6 +114,19 @@ app.get('/api/v1/clients/:id', (req, res) => {
  *      priority (optional): integer,
  *
  */
+
+const updatePriority = (id, priority) => {
+  db.prepare('UPDATE clients SET priority = ? WHERE id = ?').run(priority, id)
+}
+
+const updateStatus = (id, status) => {
+
+}
+
+const updatePriorityAndStatus = (id, priority, status) => {
+  db.prepare('UPDATE clients SET status = ?, priority = ? WHERE id = ?').run(status, priority, id)
+}
+
 app.put('/api/v1/clients/:id', (req, res) => {
   const id = parseInt(req.params.id , 10);
   const { valid, messageObj } = validateId(id);
@@ -124,10 +137,25 @@ app.put('/api/v1/clients/:id', (req, res) => {
   let { status, priority } = req.body;
   let clients = db.prepare('select * from clients').all();
   const client = clients.find(client => client.id === id);
-
-  /* ---------- Update code below ----------*/
-
-
+  const clients_with_same_status = db.prepare('select * from clients where status = ?').all(status);
+  const not_conflicting = clients_with_same_status.filter(client => client.priority == priority).length == 0 // check if any conflicting clients
+  if (status && priority) {
+    //runs if both status and priority are in body
+    let swimlaneToUpdate = db.prepare("select * from clients where status = ? and priority >= ?").all(status, priority) // get list of all clients after the new priority
+    for (const job of swimlaneToUpdate) {
+      updatePriority(job.id, job.priority + 1) //add 1 to priority of each client in list to shift down one
+    }
+    updatePriorityAndStatus(id, priority, status) //finally, update the client that needs to be updated
+  } else if (priority && not_conflicting) {
+    //runs if priority is in body
+    updatePriority(id, priority) //update priority if no conflicts
+  } else {
+    //runs if status is in body
+    if (client.status != status && not_conflicting) {
+      // checks if swimlane stayed the same
+      updatePriorityAndStatus(id, db.prepare("select * from clients where status = ? order by priority DESC").all(status)[0].priority + 1, status) //update status/swimlane of client and changes priority to lowest priority
+    }
+  }
 
   return res.status(200).send(clients);
 });
