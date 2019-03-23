@@ -119,10 +119,6 @@ const updatePriority = (id, priority) => {
   db.prepare('UPDATE clients SET priority = ? WHERE id = ?').run(priority, id)
 }
 
-const updateStatus = (id, status) => {
-
-}
-
 const updatePriorityAndStatus = (id, priority, status) => {
   db.prepare('UPDATE clients SET status = ?, priority = ? WHERE id = ?').run(status, priority, id)
 }
